@@ -1,23 +1,32 @@
-# 使用 Node.js 官方基础镜像
-FROM node:18
+# 1. 构建前端应用
+FROM node:16-alpine AS build-stage
 
-# 设置工作目录
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# 复制 package.json 和 package-lock.json
-COPY package*.json ./
-
-# 安装依赖
+# 复制前端代码
+COPY frontend/package*.json ./frontend/
+WORKDIR /app/frontend
 RUN npm install
+COPY frontend/ .
+RUN npm run build
 
-# 复制源代码
-COPY . .
+# 2. 设置后端环境
+FROM node:16-alpine AS server-stage
 
-# 暴露应用运行的端口
+WORKDIR /app
+
+# 复制后端代码
+COPY server.js ./
+COPY backend/package*.json ./backend/
+WORKDIR /app/backend
+RUN npm install
+WORKDIR /app
+
+# 复制前端构建的静态文件到 /app/public
+COPY --from=build-stage /app/frontend/dist /app/public
+
+# 配置端口
 EXPOSE 3000
 
-# 使用 pm2 运行应用，确保后台稳定运行
-RUN npm install -g pm2
-
-# 启动应用
-CMD ["pm2-runtime", "server.js"]
+# 启动 server.js 服务器
+CMD ["node", "server.js"]
